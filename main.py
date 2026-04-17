@@ -14,7 +14,7 @@ app = FastAPI(title="VibroScan API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:4200", "https://vibroscan.netlify.app"],
+    allow_origins=["http://localhost:4200", "https://vibroscan.netlify.app", "https://vibroscan.netlify.app/"],
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
