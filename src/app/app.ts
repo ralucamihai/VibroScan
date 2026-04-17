@@ -622,7 +622,7 @@ export class AppComponent implements OnInit, OnDestroy {
       diagnostic
     };
 
-    this.http.post<any>('http://localhost:8000/api/readings', body).subscribe({
+    this.http.post<any>('https://vibroscan-api.onrender.com', body).subscribe({
       next: (res) => {
         this.saveStatus = 'ok';
         this.isSaving = false;

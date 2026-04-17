@@ -20,8 +20,8 @@ export class ChatbotComponent implements OnInit, AfterViewChecked {
 
   @ViewChild('messagesContainer') messagesContainer!: ElementRef;
 
-  private apiUrl = 'http://localhost:8000/api';
-  private aiUrl = 'http://localhost:8000/api/chatbot';
+  private apiUrl = 'https://vibroscan.onrender.com/api/chatbot';
+  private aiUrl = 'https://vibroscan.onrender.com/api/chatbot';
 
   isOpen = false;
   isLoading = false;
