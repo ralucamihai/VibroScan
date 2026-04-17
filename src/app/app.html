@@ -1,0 +1,545 @@
+<div class="app-shell">
+
+  <!-- ═══ TOPBAR ═══════════════════════════════════════════════════════ -->
+  <header class="topbar">
+    <div class="topbar-left">
+
+      <!-- Hamburger button — only visible on mobile -->
+      <button class="hamburger-btn" *ngIf="isMobile" (click)="toggleSidebar()" [class.open]="sidebarOpen" aria-label="Toggle sidebar">
+        <span></span><span></span><span></span>
+      </button>
+
+      <div class="logo-ring">
+        <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="20" cy="20" r="18" stroke="#00e5ff" stroke-width="1.5" stroke-dasharray="4 2"/>
+          <circle cx="20" cy="20" r="10" stroke="#00e5ff" stroke-width="1" opacity="0.5"/>
+          <circle cx="20" cy="20" r="4" fill="#00e5ff"/>
+          <line x1="20" y1="2" x2="20" y2="10" stroke="#00e5ff" stroke-width="1.5"/>
+          <line x1="20" y1="30" x2="20" y2="38" stroke="#00e5ff" stroke-width="1.5"/>
+          <line x1="2" y1="20" x2="10" y2="20" stroke="#00e5ff" stroke-width="1.5"/>
+          <line x1="30" y1="20" x2="38" y2="20" stroke="#00e5ff" stroke-width="1.5"/>
+        </svg>
+      </div>
+      <div class="topbar-title">
+        <span class="title-main">VIBRATION ANALYZER</span>
+        <span class="title-sub" *ngIf="!isMobile">Motor Signal Processing · Fourier Analysis</span>
+      </div>
+    </div>
+
+    <!-- KPI pills — hidden on mobile to save space -->
+    <div class="topbar-kpis" *ngIf="simulated && !isMobile">
+      <div class="kpi-pill cyan">
+        <span class="kpi-label">FREQ</span>
+        <span class="kpi-val">{{ frequency }} Hz</span>
+      </div>
+      <div class="kpi-pill orange">
+        <span class="kpi-label">DOM</span>
+        <span class="kpi-val">{{ dominantFreq }} Hz</span>
+      </div>
+      <div class="kpi-pill purple">
+        <span class="kpi-label">POWER</span>
+        <span class="kpi-val">{{ totalPower }}</span>
+      </div>
+      <div class="kpi-pill green">
+        <span class="kpi-label">BW</span>
+        <span class="kpi-val">{{ bandwidth }} Hz</span>
+      </div>
+    </div>
+
+    <!-- Mobile KPI strip: just dominant freq -->
+    <div class="topbar-kpis-mobile" *ngIf="simulated && isMobile">
+      <div class="kpi-pill cyan">
+        <span class="kpi-label">FREQ</span>
+        <span class="kpi-val">{{ frequency }} Hz</span>
+      </div>
+      <div class="kpi-pill orange">
+        <span class="kpi-label">DOM</span>
+        <span class="kpi-val">{{ dominantFreq }} Hz</span>
+      </div>
+    </div>
+
+    <div class="topbar-right">
+      <div class="status-dot" [class.active]="simulated" [class.calculating]="isCalculating"></div>
+      <span class="status-text" *ngIf="!isMobile">{{ isCalculating ? 'PROCESEAZĂ...' : simulated ? 'ACTIV' : 'STANDBY' }}</span>
+    </div>
+  </header>
+
+  <!-- ═══ MAIN LAYOUT ════════════════════════════════════════════════════ -->
+  <div class="workspace">
+
+    <!-- SIDEBAR OVERLAY — shown on mobile when sidebarOpen is true -->
+    <div class="sidebar-overlay" *ngIf="isMobile && sidebarOpen" (click)="closeSidebar()"></div>
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar" [class.sidebar-open]="sidebarOpen" [class.sidebar-mobile]="isMobile">
+      <div class="sidebar-section">
+        <div class="section-header">
+          <span class="section-icon">⚙️</span>
+          <span>PARAMETRI MOTOR</span>
+        </div>
+
+        <div class="param-group">
+          <label class="param-label">
+            <span>Turație (RPM)</span>
+            <span class="param-val cyan">{{ rpm }}</span>
+          </label>
+          <input type="range" min="500" max="6000" step="100" [(ngModel)]="rpm" (ngModelChange)="onParamChange()" class="slider cyan">
+          <div class="param-hint">Frecvență: {{ frequency }} Hz</div>
+        </div>
+
+        <div class="param-group">
+          <label class="param-label">
+            <span>Nr. Armonici</span>
+            <span class="param-val cyan">{{ numHarmonics }}</span>
+          </label>
+          <input type="range" min="1" max="10" step="1" [(ngModel)]="numHarmonics" (ngModelChange)="onParamChange()" class="slider cyan">
+        </div>
+
+        <div class="param-group">
+          <label class="param-label">
+            <span>Frecv. Eșantionare</span>
+            <span class="param-val cyan">{{ samplingRate }} Hz</span>
+          </label>
+          <input type="range" min="1000" max="10000" step="500" [(ngModel)]="samplingRate" (ngModelChange)="onParamChange()" class="slider cyan">
+        </div>
+
+        <div class="param-group">
+          <label class="param-label">
+            <span>Durată Simulare</span>
+            <span class="param-val cyan">{{ duration.toFixed(1) }} s</span>
+          </label>
+          <input type="range" min="1.0" max="5.0" step="0.5" [(ngModel)]="duration" (ngModelChange)="onParamChange()" class="slider cyan">
+        </div>
+
+        <div class="param-group">
+          <label class="param-label">
+            <span>Nivel Zgomot</span>
+            <span class="param-val orange">{{ noiseLevel.toFixed(2) }}</span>
+          </label>
+          <input type="range" min="0" max="0.5" step="0.01" [(ngModel)]="noiseLevel" (ngModelChange)="onParamChange()" class="slider orange">
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="section-header">
+          <span class="section-icon">🔊</span>
+          <span>AMPLITUDINI ARMONICI</span>
+        </div>
+        <div class="harmonic-sliders" *ngFor="let i of harmonicsArray()">
+          <label class="param-label small">
+            <span>A{{ i+1 }} · {{ ((i+1)*frequency).toFixed(0) }}Hz</span>
+            <span class="param-val small" [style.color]="amplitudes[i] > 0.5 ? '#ff4757' : amplitudes[i] > 0.2 ? '#00e5ff' : '#636e72'">{{ amplitudes[i].toFixed(2) }}</span>
+          </label>
+          <input type="range" min="0" max="1" step="0.05" [(ngModel)]="amplitudes[i]" (ngModelChange)="onParamChange()" class="slider mini">
+        </div>
+      </div>
+
+      <div class="sidebar-actions">
+        <button class="btn-simulate" (click)="simulate()" [disabled]="isCalculating">
+          <span *ngIf="!isCalculating">▶ SIMULEAZĂ</span>
+          <span *ngIf="isCalculating" class="pulse">◼ PROCESARE...</span>
+        </button>
+        <button class="btn-project" (click)="loadProjectScenario()">
+          📋 Scenariul Proiect
+        </button>
+        <div class="project-badge" *ngIf="projectLoaded">✅ Scenariu proiect activ</div>
+      </div>
+
+      <!-- Fourier Terms (only visible on tab 1) -->
+      <div class="sidebar-section" *ngIf="activeTab === 1 && simulated">
+        <div class="section-header">
+          <span class="section-icon">🔄</span>
+          <span>SERII FOURIER</span>
+        </div>
+        <div class="param-group">
+          <label class="param-label">
+            <span>Termeni Fourier</span>
+            <span class="param-val cyan">{{ fourierTerms }}</span>
+          </label>
+          <input type="range" min="1" max="20" step="1" [(ngModel)]="fourierTerms" (ngModelChange)="renderTab2Debounced()" class="slider cyan">
+        </div>
+        <div class="mse-display" *ngIf="mseError">
+          <span class="mse-label">MSE</span>
+          <span class="mse-val">{{ mseError }}</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main class="main-content">
+
+      <!-- TAB NAV -->
+      <nav class="tab-nav">
+        <button class="tab-btn" [class.active]="activeTab===0" (click)="selectTab(0)">
+          <span class="tab-icon">📊</span><span class="tab-label">Analiză Completă</span>
+        </button>
+    
+        <button class="tab-btn" [class.active]="activeTab===5" (click)="selectTab(5)">
+          <span class="tab-icon">🔊</span><span class="tab-label">Audio Interactiv</span>
+        </button>
+      </nav>
+
+      <!-- TAB CONTENT -->
+      <div class="tab-content" [class.loading]="isCalculating">
+
+        <!-- ─── NO SIM STATE ─── -->
+        <div class="no-sim" *ngIf="!simulated && !isCalculating">
+          <div class="no-sim-icon">⚙️</div>
+          <div class="no-sim-title">Analiză Vibrații Motor</div>
+          <div class="no-sim-sub" *ngIf="!isMobile">Ajustează parametrii din sidebar și apasă <strong>▶ SIMULEAZĂ</strong></div>
+          <div class="no-sim-sub" *ngIf="isMobile">Apasă ☰ pentru parametri, apoi <strong>▶ SIMULEAZĂ</strong></div>
+          <div class="no-sim-steps">
+            <div class="step"><span class="step-n">1</span><span>Setează RPM și numărul de armonici</span></div>
+            <div class="step"><span class="step-n">2</span><span>Ajustează amplitudinile individuale</span></div>
+            <div class="step"><span class="step-n">3</span><span>Apasă ▶ SIMULEAZĂ și explorează</span></div>
+          </div>
+          <!-- Quick simulate button on mobile no-sim screen -->
+          <button class="btn-simulate btn-simulate-center" *ngIf="isMobile" (click)="simulate()">▶ SIMULEAZĂ ACUM</button>
+        </div>
+
+        <!-- ─── TAB 0: Analiză Completă ─── -->
+        <div class="tab-panel" *ngIf="activeTab===0 && simulated">
+          <div class="panel-header">
+            <h2>📊 Analiză Completă</h2>
+          </div>
+          <div class="grid-2x2">
+            <div class="chart-card">
+              <div class="chart-title">Semnal Temporal</div>
+              <canvas #c_sig class="chart-canvas"></canvas>
+            </div>
+            <div class="chart-card">
+              <div class="chart-title">Spectru FFT</div>
+              <canvas #c_fft1 class="chart-canvas"></canvas>
+            </div>
+            <div class="chart-card">
+              <div class="chart-title">Descompunere Armonici</div>
+              <canvas #c_harmonics class="chart-canvas"></canvas>
+            </div>
+            <div class="chart-card">
+              <div class="chart-title">Spectrogramă</div>
+              <canvas #c_spectro class="chart-canvas"></canvas>
+            </div>
+          </div>
+
+          <!-- Harmonics Table — scrollable on mobile -->
+          <div class="data-table-card">
+            <div class="table-header">🔍 Armonici Detectate</div>
+            <div class="table-scroll-wrap">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Armonică</th>
+                    <th>Frecv. Teoretică (Hz)</th>
+                    <th>Frecv. Detectată (Hz)</th>
+                    <th>Amplitudine FFT</th>
+                    <th>Amplitudine Setată</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let row of harmonicsTable">
+                    <td class="td-cyan">{{ row.h }}</td>
+                    <td>{{ row.freqTheory }}</td>
+                    <td class="td-green">{{ row.freqDetected }}</td>
+                    <td class="td-orange">{{ row.amplitude }}</td>
+                    <td>{{ row.amplSet }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ─── TAB 1: Serii Fourier ─── -->
+        <div class="tab-panel" *ngIf="activeTab===1 && simulated">
+          <div class="panel-header">
+            <h2>🔄 Aproximare prin Serii Fourier</h2>
+          </div>
+          <div class="theory-box">
+            <p>Seriile Fourier permit descompunerea unui semnal periodic în sume de sinusuri și cosinusuri:</p>
+            <div class="formula">f(t) = a₀/2 + Σ [aₙ·cos(nω₀t) + bₙ·sin(nω₀t)]</div>
+          </div>
+          <div class="chart-card tall">
+            <div class="chart-title">Semnal Original vs Aproximare Fourier</div>
+            <canvas #c_fourier class="chart-canvas"></canvas>
+          </div>
+          <div class="mse-banner" *ngIf="mseError !== undefined">
+            <span class="mse-banner-label">Eroare Pătratică Medie (MSE)</span>
+            <span class="mse-banner-val">{{ mseError }}</span>
+          </div>
+          <div class="chart-card">
+            <div class="chart-title">Magnitudinea Coeficienților Fourier</div>
+            <canvas #c_coef class="chart-canvas"></canvas>
+          </div>
+        </div>
+
+        <!-- ─── TAB 2: Transformata FFT ─── -->
+        <div class="tab-panel" *ngIf="activeTab===2 && simulated">
+          <div class="panel-header">
+            <h2>📈 Transformata Fourier Discretă (FFT)</h2>
+          </div>
+          <div class="theory-box">
+            <p>Transformata Fourier convertește semnalul din domeniul temporal în domeniul frecvenței:</p>
+            <div class="formula">F(ω) = ∫ f(t)·e^(-iωt) dt</div>
+          </div>
+          <div class="chart-card tall">
+            <div class="chart-title">Spectrul Complet FFT cu Armonicile Marcate</div>
+            <canvas #c_fftFull class="chart-canvas"></canvas>
+          </div>
+          <div class="chart-card">
+            <div class="chart-title">Zoom pe Armonicile Principale</div>
+            <canvas #c_fftZoom class="chart-canvas"></canvas>
+          </div>
+          <div class="stats-row">
+            <div class="stat-card cyan">
+              <div class="stat-label">Frecvență Dominantă</div>
+              <div class="stat-val">{{ dominantFreq }} Hz</div>
+            </div>
+            <div class="stat-card orange">
+              <div class="stat-label">Putere Totală</div>
+              <div class="stat-val">{{ totalPower }}</div>
+            </div>
+            <div class="stat-card purple">
+              <div class="stat-label">Lățime de Bandă (10%)</div>
+              <div class="stat-val">{{ bandwidth }} Hz</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ─── TAB 3: Scenariu Proiect ─── -->
+        <div class="tab-panel" *ngIf="activeTab===3 && simulated">
+          <div class="panel-header">
+            <h2>🔬 Scenariul Proiect — Motor Industrial 3000 RPM</h2>
+          </div>
+          <div class="project-info-box">
+            <div class="info-row">
+              <span class="info-icon">🔧</span>
+              <span>Viteza de rotație: <strong>3000 RPM</strong> → frecvență fundamentală: <strong>50 Hz</strong></span>
+            </div>
+            <div class="info-row">
+              <span class="info-icon">⚠️</span>
+              <span>Defect mecanic: <strong>dezaxare</strong>, modelată prin armonica a 3-a → <strong>150 Hz</strong></span>
+            </div>
+            <div class="info-row">
+              <span class="info-icon">📊</span>
+              <span>Condiții reale: zgomot aleator adăugat (White Noise)</span>
+            </div>
+            <div class="formula-sm">S_total(t) = S₅₀Hz(t) + S₁₅₀Hz(t) + Zgomot(t)</div>
+          </div>
+
+          <div class="chart-card tall">
+            <div class="chart-title">Fig. 1 — Semnalul de Vibrație Brut (Domeniul Timp)</div>
+            <canvas #c_proj_time class="chart-canvas"></canvas>
+          </div>
+          <div class="info-alert warning">⚠️ Semnalul este puternic influențat de zgomot. Defectul mecanic nu poate fi identificat prin simpla observare temporală.</div>
+
+          <div class="chart-card tall">
+            <div class="chart-title">Fig. 2 — Spectrul de Frecvență (FFT) — Identificarea Defectului</div>
+            <canvas #c_proj_fft class="chart-canvas"></canvas>
+          </div>
+          <div class="info-alert success">✅ Analiza spectrală evidențiază două componente dominante: 50 Hz (funcționare normală) și 150 Hz (dezaxare detectată).</div>
+
+          <div class="proj-metrics">
+            <div class="proj-metric green">
+              <div class="pm-label">🟢 Frecvența Fundamentală</div>
+              <div class="pm-val">50 Hz</div>
+              <div class="pm-sub">Magnitudine: {{ projMag50 }}</div>
+              <div class="pm-desc">Funcționare normală</div>
+            </div>
+            <div class="proj-metric orange">
+              <div class="pm-label">🟠 Armonica a 3-a (Defect)</div>
+              <div class="pm-val">150 Hz</div>
+              <div class="pm-sub">Magnitudine: {{ projMag150 }}</div>
+              <div class="pm-desc">Dezaxare detectată</div>
+            </div>
+          </div>
+
+          <div class="section-divider">🔍 Descompunere Componente Individuale</div>
+          <div class="grid-2x2">
+            <div class="chart-card">
+              <canvas #c_proj_decomp1 class="chart-canvas"></canvas>
+            </div>
+            <div class="chart-card">
+              <canvas #c_proj_decomp2 class="chart-canvas"></canvas>
+            </div>
+            <div class="chart-card">
+              <canvas #c_proj_noise class="chart-canvas"></canvas>
+            </div>
+            <div class="chart-card">
+              <canvas #c_proj_total class="chart-canvas"></canvas>
+            </div>
+          </div>
+
+          <div class="data-table-card">
+            <div class="table-header">📋 Tabel Comparativ — Frecvențe Detectate</div>
+            <div class="table-scroll-wrap">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Componentă</th>
+                    <th>Frecv. Teoretică (Hz)</th>
+                    <th>Frecv. Detectată (Hz)</th>
+                    <th>Amplitudine FFT</th>
+                    <th>Interpretare</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let row of projComparisonData">
+                    <td>{{ row.comp }}</td>
+                    <td class="td-cyan">{{ row.freqT }}</td>
+                    <td class="td-green">{{ row.freqD }}</td>
+                    <td class="td-orange">{{ row.amp }}</td>
+                    <td class="td-purple">{{ row.interp }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="conclusion-box">
+            <div class="concl-title">🎯 Concluzii Scenariul Proiect</div>
+            <div class="concl-item"><span class="concl-n">1</span><span><strong>În domeniul timp:</strong> Semnalul pare haotic din cauza zgomotului — defectul nu este vizibil direct.</span></div>
+            <div class="concl-item"><span class="concl-n">2</span><span><strong>În domeniul frecvență:</strong> FFT izolează clar 50 Hz (rotație) și 150 Hz (dezaxare).</span></div>
+            <div class="concl-item"><span class="concl-n">3</span><span><strong>Aplicație practică:</strong> Mentenanță predictivă — detectarea defectelor înainte de avarie.</span></div>
+          </div>
+        </div>
+
+        
+        <!-- ─── TAB 5: Audio Interactiv ─── -->
+        <div class="tab-panel" *ngIf="activeTab===5 && simulated">
+          <div class="panel-header">
+            <h2>🔊 Experimentare Audio — Ascultă Armonicile!</h2>
+          </div>
+
+          <!-- 1. Semnal Complet -->
+          <div class="audio-section">
+            <div class="audio-section-title">🎵 1. Semnalul Complet al Motorului</div>
+            <div class="audio-card-full">
+              <div class="audio-card-info">
+                <div class="aci-row"><span class="aci-key">Frecvență fundamentală:</span><span class="aci-val cyan">{{ frequency }} Hz</span></div>
+                <div class="aci-row"><span class="aci-key">Armonici active:</span><span class="aci-val">{{ numHarmonics }}</span></div>
+                <div class="aci-row"><span class="aci-key">Durată:</span><span class="aci-val">{{ duration.toFixed(1) }} s</span></div>
+                <div class="aci-row"><span class="aci-key">Zgomot:</span><span class="aci-val orange">{{ noiseLevel.toFixed(2) }}</span></div>
+              </div>
+              <div class="audio-player-wrap" *ngIf="audioSrc['main']">
+                <audio controls [src]="audioSrc['main']" class="audio-player"></audio>
+              </div>
+            </div>
+          </div>
+
+          <!-- 2. Armonici individuale -->
+          <div class="audio-section">
+            <div class="audio-section-title">🎼 2. Fiecare Armonică Separat</div>
+            <div class="audio-hint">💡 Sunetul devine din ce în ce mai ascuțit pe măsură ce numărul armonicii crește!</div>
+            <div class="harmonics-audio-grid">
+              <div class="harmonic-audio-card" *ngFor="let i of harmonicsArray()" [class]="harmonicStrength(amplitudes[i])">
+                <div class="hac-header">
+                  <span class="hac-num">A{{ i+1 }}</span>
+                  <span class="hac-freq">{{ ((i+1)*frequency).toFixed(1) }} Hz</span>
+                </div>
+                <div class="hac-amp">Amplitudine: <strong>{{ amplitudes[i].toFixed(2) }}</strong></div>
+                <div class="hac-mult">= {{ i+1 }}× frecvența fundamentală</div>
+                <audio controls [src]="audioSrc['harm_'+i]" class="audio-player-mini" *ngIf="audioSrc['harm_'+i]"></audio>
+                <div class="hac-strength">
+                  <span *ngIf="amplitudes[i] > 0.5" class="tag-strong">🔊 Puternic</span>
+                  <span *ngIf="amplitudes[i] > 0.2 && amplitudes[i] <= 0.5" class="tag-medium">🔉 Mediu</span>
+                  <span *ngIf="amplitudes[i] <= 0.2" class="tag-weak">🔈 Slab</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 3. Construcție Progresivă -->
+          <div class="audio-section">
+            <div class="audio-section-title">🎚️ 3. Construcția Progresivă a Semnalului</div>
+            <div class="audio-hint">Mărește numărul de armonici și ascultă cum crește complexitatea!</div>
+            <div class="progressive-ctrl">
+              <label class="param-label">
+                <span>Câte armonici să includem?</span>
+                <span class="param-val cyan">{{ progressiveHarmonics }}/{{ numHarmonics }}</span>
+              </label>
+              <input type="range" min="1" [max]="numHarmonics" step="1" [(ngModel)]="progressiveHarmonics" (ngModelChange)="generateProgressiveAudio()" class="slider cyan">
+              <div class="active-freqs">
+                <span *ngFor="let f of activeFreqs()" class="freq-tag">{{ f.f }} Hz</span>
+              </div>
+            </div>
+            <audio controls [src]="audioSrc['progressive']" class="audio-player" *ngIf="audioSrc['progressive']"></audio>
+          </div>
+
+          <!-- 4. Sănătos vs Defect -->
+          <div class="audio-section">
+            <div class="audio-section-title">🔬 4. Motor Sănătos vs Motor cu Defect</div>
+            <div class="versus-grid">
+              <div class="versus-card healthy">
+                <div class="vc-title">✅ Motor Sănătos</div>
+                <div class="vc-desc">Doar frecvența fundamentală (50 Hz). Ton constant, uniform, previzibil.</div>
+                <audio controls [src]="audioSrc['healthy']" class="audio-player" *ngIf="audioSrc['healthy']"></audio>
+                <div class="vc-info">🎵 Un ton constant, monoton — exact cum ar trebui să sune un motor sănătos!</div>
+              </div>
+              <div class="versus-card defect">
+                <div class="vc-title">⚠️ Motor cu Defect</div>
+                <div class="vc-desc">Fundamentală (50 Hz) + Armonica a 3-a (150 Hz = dezaxare).</div>
+                <audio controls [src]="audioSrc['defect']" class="audio-player" *ngIf="audioSrc['defect']"></audio>
+                <div class="vc-info">🔊 Sunet mai complex cu "bătăi" periodice — un tehnician experimentat aude defectul!</div>
+              </div>
+            </div>
+            <div class="explainer-box">
+              <strong>💡 De Ce Se Aud Diferit?</strong>
+              <div class="expl-row">🟢 Motor sănătos: O singură frecvență (50 Hz) → sunet pur, simplu. Ca o flaut pe o notă.</div>
+              <div class="expl-row">🟠 Motor defect: Două frecvențe (50+150 Hz) → "bătăi" la 100 Hz (|150-50|). Ca două fluiere disonante.</div>
+              <div class="expl-row">🏭 FFT oferă diagnostic precis și obiectiv, chiar dacă ochii nu văd nimic în domeniul timp!</div>
+            </div>
+          </div>
+
+          <!-- 5. Sintetizator Custom -->
+          <div class="audio-section">
+            <div class="audio-section-title">🎹 5. Sintetizatorul Tău de Armonici</div>
+            <div class="synth-panel">
+              <div class="synth-controls">
+                <div class="param-group">
+                  <label class="param-label">
+                    <span>Frecvență de bază</span>
+                    <span class="param-val cyan">{{ customBaseFreq }} Hz</span>
+                  </label>
+                  <input type="range" min="50" max="500" step="10" [(ngModel)]="customBaseFreq" class="slider cyan">
+                </div>
+                <div class="param-group">
+                  <label class="param-label">
+                    <span>Durată sunet</span>
+                    <span class="param-val cyan">{{ customDuration.toFixed(1) }} s</span>
+                  </label>
+                  <input type="range" min="0.5" max="3" step="0.1" [(ngModel)]="customDuration" class="slider cyan">
+                </div>
+              </div>
+              <div class="synth-sliders">
+                <div class="synth-harm" *ngFor="let i of customAmpsArray()">
+                  <div class="synth-harm-freq">{{ ((i+1)*customBaseFreq).toFixed(0) }} Hz</div>
+                  <input type="range" min="0" max="1" step="0.1" [(ngModel)]="customAmps[i]" class="slider mini" style="writing-mode:vertical-lr; direction:rtl; width:30px; height:80px">
+                  <div class="synth-harm-label">A{{ i+1 }}: {{ customAmps[i].toFixed(1) }}</div>
+                </div>
+              </div>
+              <button class="btn-gen-audio" (click)="generateCustomAudio()">🎵 Generează Sunetul Custom!</button>
+              <audio controls [src]="audioSrc['custom']" class="audio-player" *ngIf="audioSrc['custom']"></audio>
+            </div>
+          </div>
+        </div>
+
+        <!-- Audio tab when not simulated -->
+        <div class="tab-panel" *ngIf="activeTab===5 && !simulated">
+          <div class="no-sim">
+            <div class="no-sim-icon">🔊</div>
+            <div class="no-sim-title">Audio Interactiv</div>
+            <div class="no-sim-sub">Apasă <strong>▶ SIMULEAZĂ</strong> pentru a genera sunetele motorului</div>
+          </div>
+        </div>
+
+      </div><!-- end tab-content -->
+    </main>
+  </div>
+</div>
+<app-chatbot
+  [currentRpm]="rpm"
+  [currentNoise]="noiseLevel"
+  [harmonicsCount]="numHarmonics"
+  [dominantFreq]="dominantFreq"
+  [totalPower]="totalPower">
+</app-chatbot>

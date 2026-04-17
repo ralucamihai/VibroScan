@@ -1,0 +1,46 @@
+<div class="chat-wrapper" [class.open]="isOpen">
+  <div class="chat-header">
+    <div class="bot-info">
+      <span class="online-dot"></span>
+      <strong style="color: #00e5ff;">Vibro-AI Assistant</strong>
+    </div>
+    <button (click)="toggleChat()" class="close-btn">×</button>
+  </div>
+
+  <div class="chat-messages" #messagesContainer>
+    <div *ngFor="let m of messages" [class]="'msg ' + m.type">
+      <!-- Typing indicator -->
+      <ng-container *ngIf="m.isTyping; else normalMsg">
+        <div class="typing-indicator">
+          <span></span><span></span><span></span>
+        </div>
+      </ng-container>
+
+      <!-- Mesaj normal — innerHTML pentru Markdown rendered -->
+      <ng-template #normalMsg>
+        <span [innerHTML]="m.html"></span>
+      </ng-template>
+    </div>
+  </div>
+
+  <div class="chat-footer">
+    <input
+      [(ngModel)]="currentQuery"
+      (keyup.enter)="sendMessage()"
+      placeholder="Întreabă-mă orice..."
+      [disabled]="isLoading"
+    >
+    <button
+      (click)="sendMessage()"
+      class="send-btn"
+      [disabled]="isLoading"
+    >
+      <span *ngIf="!isLoading">➤</span>
+      <span *ngIf="isLoading" class="spinner">⟳</span>
+    </button>
+  </div>
+</div>
+
+<button class="fab-btn" (click)="toggleChat()" [hidden]="isOpen">
+  💬
+</button>
